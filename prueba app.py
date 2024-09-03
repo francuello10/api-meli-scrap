@@ -254,9 +254,21 @@ def fetch_data(producto):
     logging.info(f"Datos obtenidos: {data}")  # Verifica los datos obtenidos
     return data
 
+def get_dolar_blue_cotizacion():
+    try:
+        response = requests.get("https://dolarapi.com/v1/dolares/blue")
+        data = response.json()
+        return data.get("venta", 0)  # Usamos el valor de venta del dólar blue
+    except Exception as e:
+        logging.error(f"Error al obtener la cotización del dólar blue: {e}")
+        return 0  # Devolver 0 o algún valor por defecto en caso de error
+
 
 def prepare_data(results):
     rows = []
+    dolar_blue_cotizacion = get_dolar_blue_cotizacion()
+    logging.info(f"Cotización del dólar blue obtenida: AR$ {dolar_blue_cotizacion}")
+
     for index, result in enumerate(results):
         logging.info(f"Procesando resultado #{index + 1}: {result}")
 
@@ -315,6 +327,14 @@ def prepare_data(results):
 
         image_md = f"![Image]({image_url})"
 
+        # Obtener la moneda
+        currency = result.get("currency_id", "ARS")  # Por defecto ARS si no se especifica
+
+        # Convertir precios USD a ARS
+        price_in_ars = result.get('price', 0)
+        if currency == "USD":
+            price_in_ars *= dolar_blue_cotizacion
+
         # Agrega la fila procesada a la lista de filas
         rows.append({
             "Imagen": image_md,
@@ -322,7 +342,9 @@ def prepare_data(results):
             "Marca": brand,
             "Modelo": model,
             "SKU": sku,
-            "Precio": f"${result.get('price', 0):,.2f}",
+            "Precio": result.get('price', 0),  # Guardar el precio como número original
+            "Moneda": currency,  # Guardar la moneda
+            "Precio en ARS": price_in_ars,  # Precio convertido para ordenamiento
             "Stock Disponible": result.get("available_quantity", "No disponible"),
             "Cantidad Vendida": result.get("sold_quantity", "No disponible"),
             "Envío Gratis": free_shipping,
@@ -340,8 +362,14 @@ def prepare_data(results):
     # Crear el DataFrame a partir de las filas procesadas
     df = pd.DataFrame(rows)
 
-    # Ordenar el DataFrame por precio
-    df = df.sort_values(by=["Precio"], ascending=True).reset_index(drop=True)
+    # Convertir la columna "Precio en ARS" a numérico para asegurar el orden correcto
+    df["Precio en ARS"] = pd.to_numeric(df["Precio en ARS"])
+
+    # Ordenar el DataFrame por precio en ARS de manera ascendente
+    df = df.sort_values(by=["Precio en ARS"], ascending=True).reset_index(drop=True)
+
+    # Formatear la columna de precios con el símbolo de la moneda
+    df["Precio"] = df.apply(lambda x: f"{'AR$' if x['Moneda'] == 'ARS' else 'USD'} {x['Precio']:,.2f}", axis=1)
 
     return df
 
