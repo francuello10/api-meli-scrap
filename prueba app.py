@@ -58,7 +58,6 @@ app.layout = html.Div([
     ], style={'display': 'none'})
 ], style={'fontFamily': 'Roboto, sans-serif', 'backgroundColor': '#1e1e1e', 'padding': '40px'})
 
-
 @app.callback(
     [Output("output-message", "children"),
      Output("output-table-container", "style"),
@@ -88,14 +87,51 @@ def update_table_and_graph(n_clicks, producto, export_clicks):
 
             if isinstance(results, list) and len(results) > 0:
                 logging.info(f"Datos válidos obtenidos: {len(results)} ítems")
-                df = prepare_data(results)
+                df, min_price, mid_price, max_price = prepare_data(results)
                 seller_df = prepare_seller_data(results)
                 total_models = df["Modelo"].nunique()
-                catalog_items = len([item for item in results if item.get("in_catalog")])
+                catalog_items = len([item for item in results if item.get("catalog_listing")])
                 total_products = len(results)
                 seller_count = seller_df["Vendedor"].nunique()
 
                 fig = px.histogram(df, x="Precio", title="Distribución de Precios", template="plotly_dark")
+
+                # Estilos condicionales basados en los precios
+                style_data_conditional = [
+                    {
+                        'if': {'row_index': 'odd'},
+                        'backgroundColor': '#3a3a3a',
+                    },
+                    {
+                        'if': {'row_index': 'even'},
+                        'backgroundColor': '#2e2e2e',
+                    },
+                    {
+                        'if': {'column_id': 'Precio', 'filter_query': f'{{Precio en ARS}} <= {mid_price}'},
+                        'backgroundColor': '#285d6b',
+                        'color': '#ffffff',
+                    },
+                    {
+                        'if': {'column_id': 'Precio', 'filter_query': f'{{Precio en ARS}} > {mid_price} && {{Precio en ARS}} < {max_price}'},
+                        'backgroundColor': '#396f59',
+                        'color': '#ffffff',
+                    },
+                    {
+                        'if': {'column_id': 'Precio', 'filter_query': f'{{Precio en ARS}} >= {max_price}'},
+                        'backgroundColor': '#995b50',
+                        'color': '#ffffff',
+                    },
+                    {
+                        'if': {'filter_query': '{Moneda} = USD', 'column_id': 'Precio'},
+                        'color': '#A3E4D7',
+                        'fontWeight': 'bold',
+                    },
+                    {
+                        'if': {'filter_query': '{Moneda} = ARS', 'column_id': 'Precio'},
+                        'color': '#AEDFF7',
+                        'fontWeight': 'bold',
+                    },
+                ]
 
                 table = dash_table.DataTable(
                     data=df.to_dict("records"),
@@ -104,18 +140,19 @@ def update_table_and_graph(n_clicks, producto, export_clicks):
                         {"name": "Artículo", "id": "Artículo"},
                         {"name": "Marca", "id": "Marca"},
                         {"name": "Modelo", "id": "Modelo"},
-                        {"name": "Condición", "id": "Condición"},  # Nueva columna para la condición
+                        {"name": "Condición", "id": "Condición"},
                         {"name": "SKU", "id": "SKU"},
                         {"name": "Precio", "id": "Precio"},
                         {"name": "Stock Disponible", "id": "Stock Disponible"},
                         {"name": "Cantidad Vendida", "id": "Cantidad Vendida"},
-                        {"name": "Envío Gratis", "id": "Envío Gratis"},
-                        {"name": "FULL", "id": "FULL"},
+                        {"name": "Envío Gratis", "id": "Envío Gratis", "presentation": "markdown"},
+                        {"name": "FULL", "id": "FULL", "presentation": "markdown"},
                         {"name": "Vendedor", "id": "Vendedor"},
                         {"name": "Calificación del Vendedor", "id": "Reputación del Vendedor"},
                         {"name": "Tipo de Publicación", "id": "Tipo de Publicación"},
-                        {"name": "Publicación en Catálogo", "id": "in_catalog"},
-                        {"name": "Url", "id": "Ver en MercadoLibre", "presentation": "markdown"}
+                        # Aquí aseguramos que el nombre de la columna sea "Publicación en Catálogo" y que coincida con el nombre en los datos
+                        {"name": "Publicación en Catálogo", "id": "Publicación en Catálogo"},
+                        {"name": "Url", "id": "Ver en MercadoLibre", "presentation": "markdown"},
                     ],
                     style_cell={
                         'padding': '5px',
@@ -129,18 +166,7 @@ def update_table_and_graph(n_clicks, producto, export_clicks):
                         'overflow': 'hidden',
                         'textOverflow': 'ellipsis',
                     },
-                    style_data_conditional=[
-                        {
-                            'if': {'column_id': 'Imagen'},
-                            'width': '45px',
-                            'height': '45px',
-                            'textAlign': 'center',
-                            'padding': '2px',
-                            'whiteSpace': 'normal',
-                            'overflow': 'hidden',
-                        },
-                        # Otros estilos condicionales...
-                    ],
+                    style_data_conditional=style_data_conditional,
                     style_header={
                         'backgroundColor': '#444',
                         'color': 'white',
@@ -183,7 +209,6 @@ def update_table_and_graph(n_clicks, producto, export_clicks):
                         'textAlign': 'center'
                     },
                     style_table={'overflowX': 'auto', 'minWidth': '100%', 'maxWidth': '100%'},
-                    # Asegura que ocupe bien el espacio
                     sort_action="native",
                     filter_action="native",
                     row_selectable="multi",
@@ -246,6 +271,7 @@ def update_table_and_graph(n_clicks, producto, export_clicks):
     raise exceptions.PreventUpdate
 
 
+
 def fetch_data(producto):
     url = f"http://127.0.0.1:8000/scrape?producto={producto}"
     logging.info(f"Haciendo solicitud a la URL: {url}")
@@ -289,7 +315,6 @@ def prepare_data(results):
         brand = "Marca no disponible"
         model = "Modelo no disponible"
         sku = "SKU no disponible"
-        condition = result.get("condition", "Condición no disponible")  # Obtener la condición del producto
 
         # Procesa cada atributo en la lista de atributos
         for attr in attributes:
@@ -306,12 +331,12 @@ def prepare_data(results):
         # Verificaciones adicionales antes de acceder a campos específicos
         shipping = result.get("shipping", {})
         if isinstance(shipping, dict):
-            free_shipping = "✔" if shipping.get("free_shipping") else "✖"
-            full = "✔" if "fulfillment" in shipping.get("tags", []) else "✖"
+            free_shipping = "🚚" if shipping.get("free_shipping") else "❌"
+            full = "📦" if "fulfillment" in shipping.get("tags", []) else "❌"
         else:
             logging.error(f"'shipping' no es un diccionario: {type(shipping)} - {shipping}")
-            free_shipping = "✖"
-            full = "✖"
+            free_shipping = "❌"
+            full = "❌"
 
         seller = result.get("seller", {})
         if isinstance(seller, dict):
@@ -323,31 +348,31 @@ def prepare_data(results):
             seller_reputation = "Sin categoría"
 
         listing_type = result.get("listing_type_id", "Tipo no disponible")
-        in_catalog = "✔" if result.get("catalog_listing") else "✖"
+
+        # Tratamiento de catalog_listing similar a free_shipping
+        catalog_listing = "✅" if result.get("catalog_listing") else "❌"
+
         image_url = result.get("thumbnail", "https://via.placeholder.com/150")
         permalink = result.get("permalink", "#")
 
         image_md = f"![Image]({image_url})"
 
-        # Obtener la moneda
-        currency = result.get("currency_id", "ARS")  # Por defecto ARS si no se especifica
+        currency = result.get("currency_id", "ARS")
 
-        # Convertir precios USD a ARS
         price_in_ars = result.get('price', 0)
         if currency == "USD":
             price_in_ars *= dolar_blue_cotizacion
 
-        # Agrega la fila procesada a la lista de filas
         rows.append({
             "Imagen": image_md,
             "Artículo": title,
             "Marca": brand,
             "Modelo": model,
-            "Condición": "Nuevo" if condition == "new" else "Usado",  # Convertir la condición a texto
+            "Condición": "Nuevo" if result.get("condition", "new") == "new" else "Usado",
             "SKU": sku,
-            "Precio": result.get('price', 0),  # Guardar el precio como número original
-            "Moneda": currency,  # Guardar la moneda
-            "Precio en ARS": price_in_ars,  # Precio convertido para ordenamiento
+            "Precio": result.get('price', 0),
+            "Moneda": currency,
+            "Precio en ARS": price_in_ars,
             "Stock Disponible": result.get("available_quantity", "No disponible"),
             "Cantidad Vendida": result.get("sold_quantity", "No disponible"),
             "Envío Gratis": free_shipping,
@@ -355,28 +380,24 @@ def prepare_data(results):
             "Vendedor": seller_name,
             "Reputación del Vendedor": seller_reputation,
             "Tipo de Publicación": listing_type,
-            "in_catalog": in_catalog,
+            "Publicación en Catálogo": catalog_listing,  # Aquí se muestra el emoji adecuado
             "Ver en MercadoLibre": f"[Link]({permalink})"
         })
 
     if not rows:
         logging.warning("No se pudieron preparar filas para los datos obtenidos.")
 
-    # Crear el DataFrame a partir de las filas procesadas
     df = pd.DataFrame(rows)
-
-    # Convertir la columna "Precio en ARS" a numérico para asegurar el orden correcto
     df["Precio en ARS"] = pd.to_numeric(df["Precio en ARS"])
 
-    # Ordenar el DataFrame por precio en ARS de manera ascendente
-    df = df.sort_values(by=["Precio en ARS"], ascending=True).reset_index(drop=True)
+    min_price = df["Precio en ARS"].min()
+    max_price = df["Precio en ARS"].max()
+    mid_price = (min_price + max_price) / 2
 
-    # Formatear la columna de precios con el símbolo de la moneda
+    df = df.sort_values(by=["Precio en ARS"], ascending=True).reset_index(drop=True)
     df["Precio"] = df.apply(lambda x: f"{'AR$' if x['Moneda'] == 'ARS' else 'USD'} {x['Precio']:,.2f}", axis=1)
 
-    return df
-
-
+    return df, min_price, mid_price, max_price
 
 
 def prepare_seller_data(results):
@@ -416,4 +437,3 @@ def prepare_seller_data(results):
 
 if __name__ == "__main__":
     app.run_server(debug=True, host="0.0.0.0", port=8050)
-
