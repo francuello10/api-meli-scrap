@@ -104,6 +104,7 @@ def update_table_and_graph(n_clicks, producto, export_clicks):
                         {"name": "Artículo", "id": "Artículo"},
                         {"name": "Marca", "id": "Marca"},
                         {"name": "Modelo", "id": "Modelo"},
+                        {"name": "Condición", "id": "Condición"},  # Nueva columna para la condición
                         {"name": "SKU", "id": "SKU"},
                         {"name": "Precio", "id": "Precio"},
                         {"name": "Stock Disponible", "id": "Stock Disponible"},
@@ -288,6 +289,7 @@ def prepare_data(results):
         brand = "Marca no disponible"
         model = "Modelo no disponible"
         sku = "SKU no disponible"
+        condition = result.get("condition", "Condición no disponible")  # Obtener la condición del producto
 
         # Procesa cada atributo en la lista de atributos
         for attr in attributes:
@@ -341,6 +343,7 @@ def prepare_data(results):
             "Artículo": title,
             "Marca": brand,
             "Modelo": model,
+            "Condición": "Nuevo" if condition == "new" else "Usado",  # Convertir la condición a texto
             "SKU": sku,
             "Precio": result.get('price', 0),  # Guardar el precio como número original
             "Moneda": currency,  # Guardar la moneda
