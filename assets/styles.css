@@ -192,14 +192,6 @@ td img {
     margin: auto;
 }
 
-/* Estilos para el heatmap de la tabla de vendedores */
-td.heatmap {
-    background-color: #1e1e1e; /* Color base */
-    color: #ffffff;
-    font-weight: bold;
-    transition: background-color 0.3s ease;
-}
-
 /* Resaltado de precio según la moneda */
 td.precio-usd {
     color: #00FF00;
