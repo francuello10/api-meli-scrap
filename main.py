@@ -1,5 +1,5 @@
 import requests
-from fastapi import FastAPI, Query
+from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 import logging
 import json
@@ -9,13 +9,8 @@ app = FastAPI()
 logging.basicConfig(level=logging.INFO)
 
 @app.get("/scrape", response_class=JSONResponse)
-async def scrape(
-        producto: str,
-        estado: str = None,
-        ano: int = None
-):
-    search_query = f"{producto}"
-    url = f"https://api.mercadolibre.com/sites/MLA/search?q={search_query}"
+async def scrape(producto: str, estado: str = None, ano: int = None):
+    url = f"https://api.mercadolibre.com/sites/MLA/search?q={producto}"
 
     if estado:
         url += f"&condition={estado}"
@@ -33,10 +28,8 @@ async def scrape(
         return JSONResponse({"error": "Error al obtener datos de MercadoLibre"}, status_code=500)
 
     try:
-        # Obtener los productos desde 'results' en la respuesta de la API de Mercado Libre
         data = response.json()
 
-        # Verifica la estructura de los datos antes de procesarlos
         logging.info(f"Estructura de los datos recibidos: {type(data)}")
         logging.info(f"Ejemplo de datos recibidos: {json.dumps(data, indent=2, ensure_ascii=False)}")
 
@@ -45,14 +38,9 @@ async def scrape(
             logging.error(f"'results' no es una lista: {type(products)}")
             return JSONResponse({"error": "'results' no es una lista"}, status_code=500)
 
-        # Log de cada producto individualmente
         for index, product in enumerate(products):
-            if not isinstance(product, dict):
-                logging.error(f"El producto en la posición {index} no es un diccionario: {type(product)}")
-                continue
             logging.info(f"Producto {index + 1}: {json.dumps(product, indent=2, ensure_ascii=False)}")
 
-        # Asegúrate de devolver solo la lista de productos
         return JSONResponse({"results": products})
 
     except Exception as e:
@@ -61,4 +49,4 @@ async def scrape(
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
