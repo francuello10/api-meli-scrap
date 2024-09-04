@@ -159,7 +159,6 @@ def update_table_and_graph(n_clicks, producto, export_clicks):
                         {"name": "Envío Gratis", "id": "Envío Gratis", "presentation": "markdown"},
                         {"name": "FULL", "id": "FULL", "presentation": "markdown"},
                         {"name": "Vendedor", "id": "Vendedor"},
-                        {"name": "Calificación del Vendedor", "id": "Reputación del Vendedor"},
                         {"name": "Tipo de Publicación", "id": "Tipo de Publicación"},
                         {"name": "Publicación en Catálogo", "id": "Publicación en Catálogo"},
                         {"name": "Url", "id": "Ver en MercadoLibre", "presentation": "markdown"},
@@ -200,7 +199,6 @@ def update_table_and_graph(n_clicks, producto, export_clicks):
                     columns=[
                         {"name": "Vendedor", "id": "Vendedor"},
                         {"name": "Cantidad de Artículos", "id": "Cantidad de Artículos"},
-                        {"name": "Tipo de Vendedor", "id": "Tipo de Vendedor"},
                     ],
                     style_cell={
                         'padding': '10px',
@@ -321,24 +319,24 @@ def prepare_data(results):
     for index, result in enumerate(results):
         logging.info(f"Procesando resultado #{index + 1}: {result}")
 
-        # Verifica que 'result' sea un diccionario
         if not isinstance(result, dict):
             logging.error(f"Se esperaba un diccionario en 'result', pero se recibió: {type(result)}")
             continue
 
-        # Asegúrate de que "attributes" sea una lista
         attributes = result.get("attributes", [])
         if not isinstance(attributes, list):
             logging.error(f"Esperaba una lista de atributos, pero obtuve: {type(attributes)} - {attributes}")
             continue
 
-        # Inicializa los valores por defecto
         title = result.get("title", "Título no disponible")
         brand = "Marca no disponible"
         model = "Modelo no disponible"
         sku = "SKU no disponible"
 
-        # Procesa cada atributo en la lista de atributos
+        # Extraer la categoría del producto del campo domain_id
+        domain_id = result.get("domain_id", "")
+        categoria = domain_id.split("-")[-1] if "-" in domain_id else "Categoría desconocida"
+
         for attr in attributes:
             if isinstance(attr, dict):
                 if attr.get("id") == "BRAND":
@@ -350,7 +348,6 @@ def prepare_data(results):
             else:
                 logging.error(f"El atributo no es un diccionario: {attr}")
 
-        # Verificaciones adicionales antes de acceder a campos específicos
         shipping = result.get("shipping", {})
         if isinstance(shipping, dict):
             free_shipping = "🚚" if shipping.get("free_shipping") else "❌"
@@ -363,15 +360,12 @@ def prepare_data(results):
         seller = result.get("seller", {})
         if isinstance(seller, dict):
             seller_name = seller.get("nickname", "Desconocido")
-            seller_reputation = seller.get("seller_reputation", {}).get("level_id", "Sin categoría")
         else:
             logging.error(f"'seller' no es un diccionario: {type(seller)} - {seller}")
             seller_name = "Desconocido"
-            seller_reputation = "Sin categoría"
 
         listing_type = result.get("listing_type_id", "Tipo no disponible")
 
-        # Tratamiento de catalog_listing similar a free_shipping
         catalog_listing = "✅" if result.get("catalog_listing") else "❌"
 
         image_url = result.get("thumbnail", "https://via.placeholder.com/150")
@@ -387,7 +381,7 @@ def prepare_data(results):
 
         rows.append({
             "Imagen": image_md,
-            "Artículo": title,
+            "Artículo": f"{title} ({categoria})",  # Añadimos la categoría al lado del título
             "Marca": brand,
             "Modelo": model,
             "Condición": "Nuevo" if result.get("condition", "new") == "new" else "Usado",
@@ -400,9 +394,8 @@ def prepare_data(results):
             "Envío Gratis": free_shipping,
             "FULL": full,
             "Vendedor": seller_name,
-            "Reputación del Vendedor": seller_reputation,
             "Tipo de Publicación": listing_type,
-            "Publicación en Catálogo": catalog_listing,  # Aquí se muestra el emoji adecuado
+            "Publicación en Catálogo": catalog_listing,
             "Ver en MercadoLibre": f"[Link]({permalink})"
         })
 
@@ -441,7 +434,6 @@ def prepare_seller_data(results):
         {
             "Vendedor": seller,
             "Cantidad de Artículos": info['count'],
-            "Tipo de Vendedor": info['type']
         }
         for seller, info in seller_counts.items()
     ])
