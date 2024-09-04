@@ -4,7 +4,6 @@ import pandas as pd
 import requests
 import io
 import plotly.express as px
-import requests
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -24,7 +23,6 @@ app.layout = html.Div([
         html.Div(id="total-products", className="info-box"),
         html.Div(id="seller-count", className="info-box"),
         html.Div(id="blue-dollar", className="info-box"),
-        # Añadimos un nuevo div para mostrar la cotización del dólar blue
     ], className="info-container", style={'display': 'flex', 'justifyContent': 'space-around', 'margin': '20px 0'}),
 
     html.Div([
@@ -53,13 +51,40 @@ app.layout = html.Div([
         html.Div(id="output-seller-table", style={'margin-top': '20px', 'padding': '20px'}),
     ], style={'display': 'none'}),
 
+    # Selector para alternar entre gráficos, inicialmente oculto
+    html.Div(id="graph-selector-container", children=[
+        html.H2("Selecciona el gráfico que deseas ver",
+                style={'textAlign': 'center', 'color': '#ffffff', 'fontFamily': 'Roboto, sans-serif', 'fontSize': '24px'}),
+        dcc.RadioItems(
+            id="graph-selector",
+            options=[
+                {"label": "Histograma de Precios", "value": "histogram"},
+                {"label": "Box Plot de Precios", "value": "boxplot"},
+                {"label": "Productos por Categoría", "value": "barchart"}
+            ],
+            value="histogram",  # Valor por defecto
+            labelStyle={'display': 'inline-block', 'color': '#ffffff', 'marginRight': '10px'},
+            style={'textAlign': 'center', 'color': '#ffffff'}
+        ),
+    ], style={'textAlign': 'center', 'margin': '20px 0', 'display': 'none'}),  # Inicialmente oculto
+
+    # Contenedor del gráfico
     html.Div(id="output-graph-container", children=[
-        html.H2("Distribución de Precios",
-                style={'textAlign': 'center', 'color': '#ffffff', 'fontFamily': 'Roboto, sans-serif',
-                       'marginTop': '50px', 'fontSize': '28px'}),
         html.Div(id="output-graph", style={'margin-top': '20px'}),
     ], style={'display': 'none'})
+
 ], style={'fontFamily': 'Roboto, sans-serif', 'backgroundColor': '#1e1e1e', 'padding': '40px'})
+
+def get_current_blue_dollar():
+    try:
+        response = requests.get("https://dolarapi.com/v1/dolares/blue")
+        data = response.json()
+        blue_dollar_sale = data.get("venta", "N/A")  # Obtener el valor de venta
+        return blue_dollar_sale
+    except Exception as e:
+        logging.error(f"Error al obtener la cotización del dólar blue: {e}")
+        return "N/A"
+
 
 
 @app.callback(
@@ -76,12 +101,14 @@ app.layout = html.Div([
      Output("total-products", "children"),
      Output("seller-count", "children"),
      Output("loading-line", "style"),
-     Output("blue-dollar", "children")],  # Nuevo Output para la cotización del dólar blue
+     Output("blue-dollar", "children"),
+     Output("graph-selector-container", "style")],  # Nuevo Output para controlar la visibilidad del selector de gráficos
     [Input("search-button", "n_clicks"),
      Input("input-producto", "value"),
-     Input("export-button", "n_clicks")]
+     Input("export-button", "n_clicks"),
+     Input("graph-selector", "value")]
 )
-def update_table_and_graph(n_clicks, producto, export_clicks):
+def update_table_and_graph(n_clicks, producto, export_clicks, graph_type):
     if n_clicks > 0:
         try:
             logging.info(f"Buscando producto: {producto}")
@@ -104,9 +131,29 @@ def update_table_and_graph(n_clicks, producto, export_clicks):
                 # Obtener la cotización actual del dólar blue
                 blue_dollar = get_current_blue_dollar()
 
-                fig = px.histogram(df, x="Precio", title="Distribución de Precios", template="plotly_dark")
+                # Calcular estadísticas adicionales
+                mean_price = df["Precio en ARS"].mean()
+                median_price = df["Precio en ARS"].median()
 
-                # Estilos condicionales basados en los precios
+                # Alternar gráficos basado en la selección
+                if graph_type == "histogram":
+                    fig = px.histogram(df, x="Precio en ARS", title="Distribución de Precios", template="plotly_dark", nbins=20)
+                elif graph_type == "boxplot":
+                    fig = px.box(df, y="Precio en ARS", title="Box Plot de Precios", template="plotly_dark")
+                elif graph_type == "barchart":
+                    # Asegurarse de que la columna "Categoría" esté presente
+                    if "Categoría" in df.columns:
+                        categoria_df = df.groupby("Categoría").size().reset_index(name="Cantidad")
+                        fig = px.bar(categoria_df, x="Categoría", y="Cantidad", title="Productos por Categoría", template="plotly_dark")
+                    else:
+                        fig = None  # En caso de no tener datos, evitamos pasar un gráfico vacío
+
+                # Si es histograma o boxplot, agregar líneas de referencia para promedio y mediana
+                if fig and graph_type in ["histogram", "boxplot"]:
+                    fig.add_vline(x=mean_price, line_dash="dash", line_color="green", annotation_text=f"Promedio: ARS {mean_price:,.2f}")
+                    fig.add_vline(x=median_price, line_dash="dot", line_color="orange", annotation_text=f"Mediana: ARS {median_price:,.2f}")
+
+                # Condiciones para colorear las filas de la tabla según precios
                 style_data_conditional = [
                     {
                         'if': {'row_index': 'odd'},
@@ -122,8 +169,7 @@ def update_table_and_graph(n_clicks, producto, export_clicks):
                         'color': '#ffffff',
                     },
                     {
-                        'if': {'column_id': 'Precio',
-                               'filter_query': f'{{Precio en ARS}} > {mid_price} && {{Precio en ARS}} < {max_price}'},
+                        'if': {'column_id': 'Precio', 'filter_query': f'{{Precio en ARS}} > {mid_price} && {{Precio en ARS}} < {max_price}'},
                         'backgroundColor': '#396f59',
                         'color': '#ffffff',
                     },
@@ -144,11 +190,13 @@ def update_table_and_graph(n_clicks, producto, export_clicks):
                     },
                 ]
 
+                # Tabla de datos de productos con categoría
                 table = dash_table.DataTable(
                     data=df.to_dict("records"),
                     columns=[
                         {"name": "Imagen", "id": "Imagen", "presentation": "markdown"},
                         {"name": "Artículo", "id": "Artículo"},
+                        {"name": "Categoría", "id": "Categoría"},  # Nueva columna de categoría
                         {"name": "Marca", "id": "Marca"},
                         {"name": "Modelo", "id": "Modelo"},
                         {"name": "Condición", "id": "Condición"},
@@ -224,72 +272,39 @@ def update_table_and_graph(n_clicks, producto, export_clicks):
                     style_as_list_view=True
                 )
 
-                if ctx.triggered_id == "export-button":
-                    output = io.BytesIO()
-                    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                        df.to_excel(writer, index=False, sheet_name="Resultados")
-                        seller_df.to_excel(writer, index=False, sheet_name="Recuento de Vendedores")
-                    data_xlsx = output.getvalue()
-                    return ("Datos cargados correctamente.",
-                            {'display': 'block'},
-                            table,
-                            {'display': 'block'},
-                            seller_table,
-                            {'display': 'block'},
-                            dcc.Graph(figure=fig),
-                            dcc.send_bytes(data_xlsx, "resultados.xlsx"),
-                            f"Cantidad de Modelos listados: {total_models}",
-                            f"Modelos con publicación de catálogo existente: {catalog_items}",
-                            f"Cantidad de productos publicados: {total_products}",
-                            f"Vendedores: {seller_count}",
-                            {'display': 'none'},  # Ocultar la línea de carga
-                            f"Cotización Dólar Blue Venta: {blue_dollar} ARS")  # Devolver la cotización del dólar blue
+                # Mostrar el selector de gráficos solo si hay resultados
                 return ("Datos cargados correctamente.",
                         {'display': 'block'},
                         table,
                         {'display': 'block'},
                         seller_table,
                         {'display': 'block'},
-                        dcc.Graph(figure=fig),
+                        dcc.Graph(figure=fig) if fig else "No se encontraron datos para el gráfico.",
                         None,
                         f"Cantidad de Modelos listados: {total_models}",
                         f"Modelos con publicación de catálogo existente: {catalog_items}",
                         f"Cantidad de productos publicados: {total_products}",
                         f"Vendedores: {seller_count}",
                         {'display': 'none'},  # Ocultar la línea de carga
-                        f"Cotización Dólar Blue Venta: {blue_dollar} ARS")  # Devolver la cotización del dólar blue
-
+                        f"Cotización Dólar Blue Venta: {blue_dollar} ARS",
+                        {'display': 'block'})  # Mostrar el selector de gráficos
 
             else:
                 logging.warning("No se encontraron resultados en la búsqueda.")
-                logging.info(f"Resultados obtenidos: {results}")  # Añadir más información sobre los resultados
+                logging.info(f"Resultados obtenidos: {results}")
                 return ["No se encontraron resultados.",
                         {'display': 'none'}, None,
                         {'display': 'none'}, None,
                         {'display': 'none'}, None,
-                        None,  # download-link.data
-                        None, None, None, None, None, {'display': 'none'}]
+                        None, None, None, None, None, None, None, {'display': 'none'}]
         except Exception as e:
             logging.error(f"Error durante la obtención de datos: {str(e)}")
             return [f"Error al obtener datos: {str(e)}",
                     {'display': 'none'}, None,
                     {'display': 'none'}, None,
                     {'display': 'none'}, None,
-                    None,  # download-link.data
-                    None, None, None, None, None, {'display': 'none'}]
+                    None, None, None, None, None, None, None, {'display': 'none'}]
     raise exceptions.PreventUpdate
-
-
-def get_current_blue_dollar():
-    try:
-        response = requests.get("https://dolarapi.com/v1/dolares/blue")
-        data = response.json()
-        blue_dollar_sale = data.get("venta", "N/A")  # Obtener el valor de venta
-        return blue_dollar_sale
-    except Exception as e:
-        logging.error(f"Error al obtener la cotización del dólar blue: {e}")
-        return "N/A"
-
 
 
 def fetch_data(producto):
@@ -300,6 +315,7 @@ def fetch_data(producto):
     data = response.json()
     logging.info(f"Datos obtenidos: {data}")  # Verifica los datos obtenidos
     return data
+
 
 def get_dolar_blue_cotizacion():
     try:
@@ -381,7 +397,8 @@ def prepare_data(results):
 
         rows.append({
             "Imagen": image_md,
-            "Artículo": f"{title} ({categoria})",  # Añadimos la categoría al lado del título
+            "Artículo": title,
+            "Categoría": categoria,  # Ahora se añade correctamente la categoría
             "Marca": brand,
             "Modelo": model,
             "Condición": "Nuevo" if result.get("condition", "new") == "new" else "Usado",
@@ -439,7 +456,6 @@ def prepare_seller_data(results):
     ])
     seller_df = seller_df.sort_values(by="Cantidad de Artículos", ascending=False).reset_index(drop=True)
     return seller_df
-
 
 
 if __name__ == "__main__":
