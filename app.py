@@ -4,6 +4,7 @@ import pandas as pd
 import requests
 import io
 import plotly.express as px
+import requests
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -22,6 +23,8 @@ app.layout = html.Div([
         html.Div(id="catalog-items", className="info-box"),
         html.Div(id="total-products", className="info-box"),
         html.Div(id="seller-count", className="info-box"),
+        html.Div(id="blue-dollar", className="info-box"),
+        # Añadimos un nuevo div para mostrar la cotización del dólar blue
     ], className="info-container", style={'display': 'flex', 'justifyContent': 'space-around', 'margin': '20px 0'}),
 
     html.Div([
@@ -58,6 +61,7 @@ app.layout = html.Div([
     ], style={'display': 'none'})
 ], style={'fontFamily': 'Roboto, sans-serif', 'backgroundColor': '#1e1e1e', 'padding': '40px'})
 
+
 @app.callback(
     [Output("output-message", "children"),
      Output("output-table-container", "style"),
@@ -71,7 +75,8 @@ app.layout = html.Div([
      Output("catalog-items", "children"),
      Output("total-products", "children"),
      Output("seller-count", "children"),
-     Output("loading-line", "style")],
+     Output("loading-line", "style"),
+     Output("blue-dollar", "children")],  # Nuevo Output para la cotización del dólar blue
     [Input("search-button", "n_clicks"),
      Input("input-producto", "value"),
      Input("export-button", "n_clicks")]
@@ -89,10 +94,15 @@ def update_table_and_graph(n_clicks, producto, export_clicks):
                 logging.info(f"Datos válidos obtenidos: {len(results)} ítems")
                 df, min_price, mid_price, max_price = prepare_data(results)
                 seller_df = prepare_seller_data(results)
+
+                # Contadores actualizados
                 total_models = df["Modelo"].nunique()
                 catalog_items = len([item for item in results if item.get("catalog_listing")])
                 total_products = len(results)
                 seller_count = seller_df["Vendedor"].nunique()
+
+                # Obtener la cotización actual del dólar blue
+                blue_dollar = get_current_blue_dollar()
 
                 fig = px.histogram(df, x="Precio", title="Distribución de Precios", template="plotly_dark")
 
@@ -112,7 +122,8 @@ def update_table_and_graph(n_clicks, producto, export_clicks):
                         'color': '#ffffff',
                     },
                     {
-                        'if': {'column_id': 'Precio', 'filter_query': f'{{Precio en ARS}} > {mid_price} && {{Precio en ARS}} < {max_price}'},
+                        'if': {'column_id': 'Precio',
+                               'filter_query': f'{{Precio en ARS}} > {mid_price} && {{Precio en ARS}} < {max_price}'},
                         'backgroundColor': '#396f59',
                         'color': '#ffffff',
                     },
@@ -150,7 +161,6 @@ def update_table_and_graph(n_clicks, producto, export_clicks):
                         {"name": "Vendedor", "id": "Vendedor"},
                         {"name": "Calificación del Vendedor", "id": "Reputación del Vendedor"},
                         {"name": "Tipo de Publicación", "id": "Tipo de Publicación"},
-                        # Aquí aseguramos que el nombre de la columna sea "Publicación en Catálogo" y que coincida con el nombre en los datos
                         {"name": "Publicación en Catálogo", "id": "Publicación en Catálogo"},
                         {"name": "Url", "id": "Ver en MercadoLibre", "presentation": "markdown"},
                     ],
@@ -190,7 +200,6 @@ def update_table_and_graph(n_clicks, producto, export_clicks):
                     columns=[
                         {"name": "Vendedor", "id": "Vendedor"},
                         {"name": "Cantidad de Artículos", "id": "Cantidad de Artículos"},
-                        {"name": "Artículos con Mejor Precio", "id": "Artículos con Mejor Precio"},
                         {"name": "Tipo de Vendedor", "id": "Tipo de Vendedor"},
                     ],
                     style_cell={
@@ -235,7 +244,8 @@ def update_table_and_graph(n_clicks, producto, export_clicks):
                             f"Modelos con publicación de catálogo existente: {catalog_items}",
                             f"Cantidad de productos publicados: {total_products}",
                             f"Vendedores: {seller_count}",
-                            {'display': 'none'})  # Ocultar la línea de carga
+                            {'display': 'none'},  # Ocultar la línea de carga
+                            f"Cotización Dólar Blue Venta: {blue_dollar} ARS")  # Devolver la cotización del dólar blue
                 return ("Datos cargados correctamente.",
                         {'display': 'block'},
                         table,
@@ -248,7 +258,8 @@ def update_table_and_graph(n_clicks, producto, export_clicks):
                         f"Modelos con publicación de catálogo existente: {catalog_items}",
                         f"Cantidad de productos publicados: {total_products}",
                         f"Vendedores: {seller_count}",
-                        {'display': 'none'})  # Ocultar la línea de carga
+                        {'display': 'none'},  # Ocultar la línea de carga
+                        f"Cotización Dólar Blue Venta: {blue_dollar} ARS")  # Devolver la cotización del dólar blue
 
 
             else:
@@ -259,7 +270,7 @@ def update_table_and_graph(n_clicks, producto, export_clicks):
                         {'display': 'none'}, None,
                         {'display': 'none'}, None,
                         None,  # download-link.data
-                        None, None, None, None, {'display': 'none'}]
+                        None, None, None, None, None, {'display': 'none'}]
         except Exception as e:
             logging.error(f"Error durante la obtención de datos: {str(e)}")
             return [f"Error al obtener datos: {str(e)}",
@@ -267,8 +278,19 @@ def update_table_and_graph(n_clicks, producto, export_clicks):
                     {'display': 'none'}, None,
                     {'display': 'none'}, None,
                     None,  # download-link.data
-                    None, None, None, None, {'display': 'none'}]
+                    None, None, None, None, None, {'display': 'none'}]
     raise exceptions.PreventUpdate
+
+
+def get_current_blue_dollar():
+    try:
+        response = requests.get("https://dolarapi.com/v1/dolares/blue")
+        data = response.json()
+        blue_dollar_sale = data.get("venta", "N/A")  # Obtener el valor de venta
+        return blue_dollar_sale
+    except Exception as e:
+        logging.error(f"Error al obtener la cotización del dólar blue: {e}")
+        return "N/A"
 
 
 
@@ -402,37 +424,30 @@ def prepare_data(results):
 
 def prepare_seller_data(results):
     seller_counts = {}
-    best_prices = {}
 
     for result in results:
-        seller = result.get("best_seller", "Desconocido")
-        title = result.get("title", "Título no disponible")
-        price = result.get("price", 0)
+        seller = result.get("seller", {}).get("nickname", "Desconocido")  # Obtener el nickname del vendedor
+        seller_reputation = result.get("seller", {}).get("seller_reputation", {}).get("level_id", "Sin categoría")
 
         if seller in seller_counts:
             seller_counts[seller]['count'] += 1
         else:
-            seller_counts[seller] = {'count': 1, 'best_prices': [],
-                                     'type': result.get("seller_reputation", "Sin categoría")}
-
-        if title not in best_prices or price < best_prices[title]['price']:
-            best_prices[title] = {'seller': seller, 'price': price}
-
-    for title, data in best_prices.items():
-        seller = data['seller']
-        seller_counts[seller]['best_prices'].append(title)
+            seller_counts[seller] = {
+                'count': 1,
+                'type': seller_reputation
+            }
 
     seller_df = pd.DataFrame([
         {
             "Vendedor": seller,
             "Cantidad de Artículos": info['count'],
-            "Artículos con Mejor Precio": ', '.join(info['best_prices']),
             "Tipo de Vendedor": info['type']
         }
         for seller, info in seller_counts.items()
     ])
     seller_df = seller_df.sort_values(by="Cantidad de Artículos", ascending=False).reset_index(drop=True)
     return seller_df
+
 
 
 if __name__ == "__main__":
