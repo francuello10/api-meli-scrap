@@ -242,18 +242,47 @@ def update_table_and_graph(n_clicks, producto, export_clicks, graph_type):
                     style_as_list_view=True
                 )
 
-                seller_table = dash_table.DataTable(
+                # MODIFICACIÓN DE RECUENTO DE VENDEDORES (gráfico + tabla)
+                total_articulos = seller_df['Cantidad de Artículos'].sum()
+
+                # Cálculo de porcentaje de artículos por vendedor
+                seller_df['Porcentaje'] = (seller_df['Cantidad de Artículos'] / total_articulos) * 100
+
+                # Gráfico de torta
+                fig_pie = px.pie(seller_df, names="Vendedor", values="Cantidad de Artículos", title="Distribución por Vendedores",
+                                 hole=0.3, template="plotly_dark")
+
+                # Tabla de vendedores con porcentaje y heatmap
+                style_data_conditional_seller = [
+                    {
+                        'if': {'filter_query': f'{{Porcentaje}} >= 50', 'column_id': 'Porcentaje'},
+                        'backgroundColor': '#ff595e',
+                        'color': 'white',
+                    },
+                    {
+                        'if': {'filter_query': f'{{Porcentaje}} >= 25 && {{Porcentaje}} < 50', 'column_id': 'Porcentaje'},
+                        'backgroundColor': '#ffca3a',
+                        'color': 'white',
+                    },
+                    {
+                        'if': {'filter_query': f'{{Porcentaje}} < 25', 'column_id': 'Porcentaje'},
+                        'backgroundColor': '#1982c4',
+                        'color': 'white',
+                    },
+                ]
+
+                # Tabla de vendedores
+                seller_table_with_percentage = dash_table.DataTable(
                     data=seller_df.to_dict("records"),
                     columns=[
                         {"name": "Vendedor", "id": "Vendedor"},
                         {"name": "Cantidad de Artículos", "id": "Cantidad de Artículos"},
+                        {"name": "Porcentaje (%)", "id": "Porcentaje", "type": "numeric", "format": {'specifier': '.2f'}}
                     ],
+                    style_data_conditional=style_data_conditional_seller,
                     style_cell={
                         'padding': '10px',
-                        'whiteSpace': 'normal',
-                        'height': 'auto',
                         'textAlign': 'left',
-                        'fontFamily': 'Roboto, sans-serif',
                         'backgroundColor': '#1e1e1e',
                         'color': '#ffffff'
                     },
@@ -264,20 +293,25 @@ def update_table_and_graph(n_clicks, producto, export_clicks, graph_type):
                         'textAlign': 'center'
                     },
                     style_table={'overflowX': 'auto', 'minWidth': '100%', 'maxWidth': '100%'},
-                    sort_action="native",
-                    filter_action="native",
-                    row_selectable="multi",
-                    selected_rows=[],
                     page_size=10,
-                    style_as_list_view=True
                 )
+
+                # Crear layout dividido: gráfico a la izquierda, tabla a la derecha
+                seller_section = html.Div([
+                    html.Div(dcc.Graph(figure=fig_pie),
+                             style={'width': '45%', 'display': 'inline-block', 'paddingRight': '20px'}),
+                    # Añadir paddingRight
+                    html.Div(seller_table_with_percentage,
+                             style={'width': '45%', 'display': 'inline-block', 'verticalAlign': 'top',
+                                    'paddingLeft': '20px'})  # Añadir paddingLeft
+                ])
 
                 # Mostrar el selector de gráficos solo si hay resultados
                 return ("Datos cargados correctamente.",
                         {'display': 'block'},
                         table,
                         {'display': 'block'},
-                        seller_table,
+                        seller_section,  # Usar el nuevo layout con gráfico + tabla
                         {'display': 'block'},
                         dcc.Graph(figure=fig) if fig else "No se encontraron datos para el gráfico.",
                         None,
@@ -305,6 +339,7 @@ def update_table_and_graph(n_clicks, producto, export_clicks, graph_type):
                     {'display': 'none'}, None,
                     None, None, None, None, None, None, None, {'display': 'none'}]
     raise exceptions.PreventUpdate
+
 
 
 def fetch_data(producto):
