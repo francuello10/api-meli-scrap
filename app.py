@@ -86,7 +86,6 @@ def get_current_blue_dollar():
         return "N/A"
 
 
-
 @app.callback(
     [Output("output-message", "children"),
      Output("output-table-container", "style"),
@@ -95,17 +94,17 @@ def get_current_blue_dollar():
      Output("output-seller-table", "children"),
      Output("output-graph-container", "style"),
      Output("output-graph", "children"),
-     Output("download-link", "data"),
+     Output("download-link", "data"),  # Modificación para manejar la descarga del Excel
      Output("total-models", "children"),
      Output("catalog-items", "children"),
      Output("total-products", "children"),
      Output("seller-count", "children"),
      Output("loading-line", "style"),
      Output("blue-dollar", "children"),
-     Output("graph-selector-container", "style")],  # Nuevo Output para controlar la visibilidad del selector de gráficos
+     Output("graph-selector-container", "style")],
     [Input("search-button", "n_clicks"),
      Input("input-producto", "value"),
-     Input("export-button", "n_clicks"),
+     Input("export-button", "n_clicks"),  # Input para manejar el clic en exportar a Excel
      Input("graph-selector", "value")]
 )
 def update_table_and_graph(n_clicks, producto, export_clicks, graph_type):
@@ -137,21 +136,25 @@ def update_table_and_graph(n_clicks, producto, export_clicks, graph_type):
 
                 # Alternar gráficos basado en la selección
                 if graph_type == "histogram":
-                    fig = px.histogram(df, x="Precio en ARS", title="Distribución de Precios", template="plotly_dark", nbins=20)
+                    fig = px.histogram(df, x="Precio en ARS", title="Distribución de Precios", template="plotly_dark",
+                                       nbins=20)
                 elif graph_type == "boxplot":
                     fig = px.box(df, y="Precio en ARS", title="Box Plot de Precios", template="plotly_dark")
                 elif graph_type == "barchart":
                     # Asegurarse de que la columna "Categoría" esté presente
                     if "Categoría" in df.columns:
                         categoria_df = df.groupby("Categoría").size().reset_index(name="Cantidad")
-                        fig = px.bar(categoria_df, x="Categoría", y="Cantidad", title="Productos por Categoría", template="plotly_dark")
+                        fig = px.bar(categoria_df, x="Categoría", y="Cantidad", title="Productos por Categoría",
+                                     template="plotly_dark")
                     else:
                         fig = None  # En caso de no tener datos, evitamos pasar un gráfico vacío
 
                 # Si es histograma o boxplot, agregar líneas de referencia para promedio y mediana
                 if fig and graph_type in ["histogram", "boxplot"]:
-                    fig.add_vline(x=mean_price, line_dash="dash", line_color="green", annotation_text=f"Promedio: ARS {mean_price:,.2f}")
-                    fig.add_vline(x=median_price, line_dash="dot", line_color="orange", annotation_text=f"Mediana: ARS {median_price:,.2f}")
+                    fig.add_vline(x=mean_price, line_dash="dash", line_color="green",
+                                  annotation_text=f"Promedio: ARS {mean_price:,.2f}")
+                    fig.add_vline(x=median_price, line_dash="dot", line_color="orange",
+                                  annotation_text=f"Mediana: ARS {median_price:,.2f}")
 
                 # Condiciones para colorear las filas de la tabla según precios
                 style_data_conditional = [
@@ -169,7 +172,8 @@ def update_table_and_graph(n_clicks, producto, export_clicks, graph_type):
                         'color': '#ffffff',
                     },
                     {
-                        'if': {'column_id': 'Precio', 'filter_query': f'{{Precio en ARS}} > {mid_price} && {{Precio en ARS}} < {max_price}'},
+                        'if': {'column_id': 'Precio',
+                               'filter_query': f'{{Precio en ARS}} > {mid_price} && {{Precio en ARS}} < {max_price}'},
                         'backgroundColor': '#396f59',
                         'color': '#ffffff',
                     },
@@ -249,7 +253,8 @@ def update_table_and_graph(n_clicks, producto, export_clicks, graph_type):
                 seller_df['Porcentaje'] = (seller_df['Cantidad de Artículos'] / total_articulos) * 100
 
                 # Gráfico de torta
-                fig_pie = px.pie(seller_df, names="Vendedor", values="Cantidad de Artículos", title="Distribución por Vendedores",
+                fig_pie = px.pie(seller_df, names="Vendedor", values="Cantidad de Artículos",
+                                 title="Distribución por Vendedores",
                                  hole=0.3, template="plotly_dark")
 
                 # Tabla de vendedores con porcentaje y heatmap
@@ -260,7 +265,8 @@ def update_table_and_graph(n_clicks, producto, export_clicks, graph_type):
                         'color': 'white',
                     },
                     {
-                        'if': {'filter_query': f'{{Porcentaje}} >= 25 && {{Porcentaje}} < 50', 'column_id': 'Porcentaje'},
+                        'if': {'filter_query': f'{{Porcentaje}} >= 25 && {{Porcentaje}} < 50',
+                               'column_id': 'Porcentaje'},
                         'backgroundColor': '#ffca3a',
                         'color': 'white',
                     },
@@ -277,7 +283,8 @@ def update_table_and_graph(n_clicks, producto, export_clicks, graph_type):
                     columns=[
                         {"name": "Vendedor", "id": "Vendedor"},
                         {"name": "Cantidad de Artículos", "id": "Cantidad de Artículos"},
-                        {"name": "Porcentaje (%)", "id": "Porcentaje", "type": "numeric", "format": {'specifier': '.2f'}}
+                        {"name": "Porcentaje (%)", "id": "Porcentaje", "type": "numeric",
+                         "format": {'specifier': '.2f'}}
                     ],
                     style_data_conditional=style_data_conditional_seller,
                     style_cell={
@@ -306,22 +313,48 @@ def update_table_and_graph(n_clicks, producto, export_clicks, graph_type):
                                     'paddingLeft': '20px'})  # Añadir paddingLeft
                 ])
 
-                # Mostrar el selector de gráficos solo si hay resultados
+                # Lógica de exportación a Excel:
+                if export_clicks > 0:
+                    # Crear archivo Excel en memoria
+                    buffer = io.BytesIO()
+                    with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+                        df.to_excel(writer, index=False, sheet_name="Resultados")
+                    buffer.seek(0)
+                    # Devolver el archivo para descargar
+                    return ("Datos cargados correctamente.",
+                            {'display': 'block'},
+                            table,
+                            {'display': 'block'},
+                            seller_section,
+                            {'display': 'block'},
+                            dcc.Graph(figure=fig) if fig else "No se encontraron datos para el gráfico.",
+                            dcc.send_bytes(buffer.getvalue(), "resultados_scraping.xlsx"),
+                            # Aquí se envía el archivo Excel
+                            f"Cantidad de Modelos listados: {total_models}",
+                            f"Modelos con publicación de catálogo existente: {catalog_items}",
+                            f"Cantidad de productos publicados: {total_products}",
+                            f"Vendedores: {seller_count}",
+                            {'display': 'none'},  # Ocultar la línea de carga
+                            f"Cotización Dólar Blue Venta: {blue_dollar} ARS",
+                            {'display': 'block'}
+                            )
+
+                # Si no se exporta, retornar sin cambios:
                 return ("Datos cargados correctamente.",
                         {'display': 'block'},
                         table,
                         {'display': 'block'},
-                        seller_section,  # Usar el nuevo layout con gráfico + tabla
+                        seller_section,
                         {'display': 'block'},
                         dcc.Graph(figure=fig) if fig else "No se encontraron datos para el gráfico.",
-                        None,
+                        None,  # No se devuelve archivo Excel si no se hizo clic en exportar
                         f"Cantidad de Modelos listados: {total_models}",
                         f"Modelos con publicación de catálogo existente: {catalog_items}",
                         f"Cantidad de productos publicados: {total_products}",
                         f"Vendedores: {seller_count}",
                         {'display': 'none'},  # Ocultar la línea de carga
                         f"Cotización Dólar Blue Venta: {blue_dollar} ARS",
-                        {'display': 'block'})  # Mostrar el selector de gráficos
+                        {'display': 'block'})
 
             else:
                 logging.warning("No se encontraron resultados en la búsqueda.")
@@ -339,7 +372,6 @@ def update_table_and_graph(n_clicks, producto, export_clicks, graph_type):
                     {'display': 'none'}, None,
                     None, None, None, None, None, None, None, {'display': 'none'}]
     raise exceptions.PreventUpdate
-
 
 
 def fetch_data(producto):
