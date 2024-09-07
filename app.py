@@ -75,17 +75,6 @@ app.layout = html.Div([
 
 ], style={'fontFamily': 'Roboto, sans-serif', 'backgroundColor': '#1e1e1e', 'padding': '40px'})
 
-def get_current_blue_dollar():
-    try:
-        response = requests.get("https://dolarapi.com/v1/dolares/blue")
-        data = response.json()
-        blue_dollar_sale = data.get("venta", "N/A")  # Obtener el valor de venta
-        return blue_dollar_sale
-    except Exception as e:
-        logging.error(f"Error al obtener la cotización del dólar blue: {e}")
-        return "N/A"
-
-
 @app.callback(
     [Output("output-message", "children"),
      Output("output-table-container", "style"),
@@ -127,8 +116,14 @@ def update_table_and_graph(n_clicks, producto, export_clicks, graph_type):
                 total_products = len(results)
                 seller_count = seller_df["Vendedor"].nunique()
 
-                # Obtener la cotización actual del dólar blue
-                blue_dollar = get_current_blue_dollar()
+                # Solicitar el valor del dólar blue desde el backend
+                try:
+                    response = requests.get("http://127.0.0.1:8000/dolar/blue")
+                    blue_dollar_data = response.json()
+                    blue_dollar = blue_dollar_data.get("dollar_blue_sale_value", "N/A")
+                except Exception as e:
+                    logging.error(f"Error al obtener la cotización del dólar blue desde el backend: {e}")
+                    blue_dollar = "N/A"
 
                 # Calcular estadísticas adicionales
                 mean_price = df["Precio en ARS"].mean()
