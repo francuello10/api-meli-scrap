@@ -20,7 +20,7 @@ app.meta_tags = [
     {"name": "viewport", "content": "width=device-width, initial-scale=1.0"},
     {"property": "og:title", "content": "Encuentra los mejores productos al precio más bajo"},
     {"property": "og:description", "content": "La herramienta perfecta para identificar las ofertas más competitivas del mercado."},
-    {"property": "og:image", "content": "https://franscrap.duckdns.org/assets/meli-dev.png"},  # Asegúrate de tener una imagen accesible
+    {"property": "og:image", "content": "https://franscrap.duckdns.org/assets/meli-dev.png"},  # Asegúrate de que esta imagen esté accesible
     {"property": "og:image:width", "content": "512"},  # Si tienes una imagen de 1200x630 px, actualiza este valor
     {"property": "og:image:height", "content": "512"},
     {"property": "og:url", "content": "https://franscrap.duckdns.org"},
@@ -31,6 +31,7 @@ app.meta_tags = [
     {"name": "twitter:description", "content": "La herramienta perfecta para identificar las ofertas más competitivas del mercado."},
     {"name": "twitter:image", "content": "https://franscrap.duckdns.org/assets/meli-dev.png"}
 ]
+
 
 app.layout = html.Div([
     html.Div(className="loading-line", id="loading-line"),
