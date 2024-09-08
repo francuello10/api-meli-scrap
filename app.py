@@ -8,9 +8,27 @@ import logging
 
 logging.basicConfig(level=logging.INFO)
 
+# Inicializa la aplicación Dash con meta_tags
 app = dash.Dash(__name__)
-app.title = "Scraping-MELI"
-app._favicon = "meli-dev.png"
+
+# Título que aparecerá en la pestaña del navegador
+app.title = "Scraping MELI - Francisco"
+app._favicon = "meli-dev.png"  # Ruta al favicon si tienes uno
+
+# Agregar las metaetiquetas para Open Graph y Twitter
+app.meta_tags = [
+    {"name": "viewport", "content": "width=device-width, initial-scale=1.0"},
+    {"property": "og:title", "content": "Scraping MELI - Encuentra lo mejor en Mercado Libre"},
+    {"property": "og:description", "content": "Descubre productos populares en Mercado Libre con análisis de datos avanzados y scraping automatizado."},
+    {"property": "og:image", "content": "https://franscrap.duckdns.org/path-to-your-image.jpg"},  # Ruta completa a tu imagen
+    {"property": "og:url", "content": "https://franscrap.duckdns.org"},
+    {"property": "og:type", "content": "website"},
+    {"property": "og:site_name", "content": "Scraping MELI"},
+    {"name": "twitter:card", "content": "summary_large_image"},
+    {"name": "twitter:title", "content": "Scraping MELI - Encuentra lo mejor en Mercado Libre"},
+    {"name": "twitter:description", "content": "Descubre productos populares en Mercado Libre con análisis de datos avanzados."},
+    {"name": "twitter:image", "content": "https://franscrap.duckdns.org/path-to-your-image.jpg"}
+]
 
 app.layout = html.Div([
     html.Div(className="loading-line", id="loading-line"),
