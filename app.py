@@ -8,28 +8,26 @@ import logging
 
 logging.basicConfig(level=logging.INFO)
 
-# Inicializa la aplicación Dash con meta_tags
 app = dash.Dash(__name__)
 
 # Título que aparecerá en la pestaña del navegador
 app.title = "Scraping MELI - Francisco"
 app._favicon = "meli-dev.png"  # Ruta al favicon si tienes uno
 
-# Agregar las metaetiquetas para Open Graph y Twitter
 app.meta_tags = [
     {"name": "viewport", "content": "width=device-width, initial-scale=1.0"},
     {"property": "og:title", "content": "Encuentra los mejores productos al precio más bajo"},
     {"property": "og:description", "content": "La herramienta perfecta para identificar las ofertas más competitivas del mercado."},
-    {"property": "og:image", "content": "https://franscrap.duckdns.org/assets/meli-dev.png"},  # Asegúrate de que esta imagen esté accesible
-    {"property": "og:image:width", "content": "512"},  # Si tienes una imagen de 1200x630 px, actualiza este valor
-    {"property": "og:image:height", "content": "512"},
+    {"property": "og:image", "content": "https://franscrap.duckdns.org/assets/meli-dev-1200x630.png"},  # Imagen 1200x630 px
+    {"property": "og:image:width", "content": "1200"},
+    {"property": "og:image:height", "content": "630"},
     {"property": "og:url", "content": "https://franscrap.duckdns.org"},
     {"property": "og:type", "content": "website"},
     {"property": "og:site_name", "content": "Scraping-MELI"},
     {"name": "twitter:card", "content": "summary_large_image"},
     {"name": "twitter:title", "content": "Encuentra los mejores productos al precio más bajo"},
     {"name": "twitter:description", "content": "La herramienta perfecta para identificar las ofertas más competitivas del mercado."},
-    {"name": "twitter:image", "content": "https://franscrap.duckdns.org/assets/meli-dev.png"}
+    {"name": "twitter:image", "content": "https://franscrap.duckdns.org/assets/meli-dev-1200x630.png"}
 ]
 
 
